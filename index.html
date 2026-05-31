@@ -2,7 +2,6 @@
    <html>
    <head>
      <title>Google Authentication</title>
-     <script src="https://accounts.google.com/gsi/client"></script>
    </head>
    <body>
      <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
@@ -10,37 +9,40 @@
        <p>Please wait while we redirect you to the Google consent screen.</p>
      </div>
      <script>
-       const urlParams = new URLSearchParams(window.location.search);
-       const origin = urlParams.get('origin');
-       const clientId = urlParams.get('client_id');
+       // 1. Check if we just loaded or if we are returning from Google redirect
+       const hash = window.location.hash;
+       const searchParams = new URLSearchParams(window.location.search);
        
-       if (!origin || !clientId) {
-         document.body.innerHTML = "<h3>Error: Missing origin or client_id parameters.</h3>";
+       if (hash && hash.includes('access_token')) {
+         // Returning from Google redirect!
+         const hashParams = new URLSearchParams(hash.substring(1)); // strip '#'
+         const accessToken = hashParams.get('access_token');
+         const targetOrigin = searchParams.get('state');
+         
+         if (window.opener) {
+           window.opener.postMessage({ access_token: accessToken }, targetOrigin);
+         } else {
+           document.body.innerHTML = "<h3>Authentication completed. You can close this window.</h3>";
+         }
+         window.close();
        } else {
-         window.onload = () => {
-           try {
-             const client = google.accounts.oauth2.initTokenClient({
-               client_id: clientId,
-               scope: 'https://www.googleapis.com/auth/calendar.readonly',
-               callback: (response) => {
-                 if (response.error) {
-                   window.opener.postMessage({ error: response.error }, origin);
-                 } else {
-                   window.opener.postMessage({ access_token: response.access_token }, origin);
-                 }
-                 window.close();
-               },
-               error_callback: (err) => {
-                 window.opener.postMessage({ error: 'Auth failed or popup blocked' }, origin);
-                 window.close();
-               }
-             });
-             client.requestAccessToken();
-           } catch (e) {
-             window.opener.postMessage({ error: e.message }, origin);
-             window.close();
-           }
-         };
+         // First load: Redirect to Google OAuth!
+         const origin = searchParams.get('origin');
+         const clientId = searchParams.get('client_id');
+         
+         if (!origin || !clientId) {
+           document.body.innerHTML = "<h3>Error: Missing origin or client_id parameters.</h3>";
+         } else {
+           const redirectUri = window.location.origin + window.location.pathname;
+           const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+             `client_id=${encodeURIComponent(clientId)}&` +
+             `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+             `response_type=token&` +
+             `scope=https://www.googleapis.com/auth/calendar.readonly&` +
+             `state=${encodeURIComponent(origin)}`;
+             
+           window.location.href = googleAuthUrl;
+         }
        }
      </script>
    </body>
