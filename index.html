@@ -1,0 +1,47 @@
+   <!DOCTYPE html>
+   <html>
+   <head>
+     <title>Google Authentication</title>
+     <script src="https://accounts.google.com/gsi/client"></script>
+   </head>
+   <body>
+     <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
+       <h3>Connecting to Google...</h3>
+       <p>Please wait while we redirect you to the Google consent screen.</p>
+     </div>
+     <script>
+       const urlParams = new URLSearchParams(window.location.search);
+       const origin = urlParams.get('origin');
+       const clientId = urlParams.get('client_id');
+       
+       if (!origin || !clientId) {
+         document.body.innerHTML = "<h3>Error: Missing origin or client_id parameters.</h3>";
+       } else {
+         window.onload = () => {
+           try {
+             const client = google.accounts.oauth2.initTokenClient({
+               client_id: clientId,
+               scope: 'https://www.googleapis.com/auth/calendar.readonly',
+               callback: (response) => {
+                 if (response.error) {
+                   window.opener.postMessage({ error: response.error }, origin);
+                 } else {
+                   window.opener.postMessage({ access_token: response.access_token }, origin);
+                 }
+                 window.close();
+               },
+               error_callback: (err) => {
+                 window.opener.postMessage({ error: 'Auth failed or popup blocked' }, origin);
+                 window.close();
+               }
+             });
+             client.requestAccessToken();
+           } catch (e) {
+             window.opener.postMessage({ error: e.message }, origin);
+             window.close();
+           }
+         };
+       }
+     </script>
+   </body>
+   </html>
